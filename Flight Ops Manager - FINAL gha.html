@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Ops Manager - ESCALE GHA</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- EXCEL Export Library (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --primary-blue: #003366; 
+            --sf-green: #008037;
+            --excel-green: #217346;
+            --header-bg: #1e293b;
+            --accent-red: #D2141C;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        /* LOGIN */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #003366 0%, #001a33 100%);
+            z-index: 9999; display: flex; justify-content: center; align-items: center;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .login-card { 
+            background: white; 
+            padding: 3rem; 
+            border-radius: var(--border-radius); 
+            width: 100%; 
+            max-width: 420px; 
+            text-align: center; 
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+        .login-card:hover {
+            transform: translateY(-5px);
+        }
+        #appContainer { display: none; }
+
+        /* CARDS */
+        .form-card {
+            background: white; 
+            padding: 24px; 
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow); 
+            margin-bottom: 24px;
+            border-top: 5px solid var(--primary-blue); 
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .form-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-blue), #004080);
+        }
+        .form-card:hover {
+            box-shadow: var(--card-hover);
+            transform: translateY(-2px);
+        }
+
+        /* TABLES */
+        .table-ah thead { background-color: var(--primary-blue); color: white; }
+        .table-sf thead { background-color: var(--sf-green); color: white; }
+        .stats-header { background-color: #FFFACD; font-weight: bold; border: 1px solid #999; }
+        .stats-row { background-color: #E0FFFF; }
+        .stats-total { background-color: #FFFF00; font-weight: bold; color: #D2141C; }
+
+        /* PAGINATION */
+        .pagination-container { display: flex; justify-content: center; margin-top: 16px; }
+        .page-btn {
+            background: white; 
+            border: 1px solid #e2e8f0; 
+            padding: 8px 12px; 
+            margin: 0 4px; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            font-weight: 600; 
+            color: #475569;
+            transition: var(--transition);
+            min-width: 36px;
+        }
+        .page-btn:hover { 
+            background: #f1f5f9; 
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+        .page-btn.active { 
+            background: var(--primary-blue); 
+            color: white; 
+            border-color: var(--primary-blue); 
+            box-shadow: 0 2px 4px rgba(0, 51, 102, 0.2);
+        }
+        .page-btn.active-sf { 
+            background: var(--sf-green); 
+            color: white; 
+            border-color: var(--sf-green); 
+            box-shadow: 0 2px 4px rgba(0, 128, 55, 0.2);
+        }
+
+        /* INPUTS */
+        .form-label { 
+            font-weight: 700; 
+            font-size: 0.75rem; 
+            color: #64748b; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .input-group-text { 
+            font-weight: 600; 
+            font-size: 0.8rem; 
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+        }
+        .form-select-airline { 
+            background-color: #f8fafc; 
+            font-weight: 600; 
+            color: #334155; 
+            border: 1px solid #e2e8f0; 
+            width: 80px;
+            transition: var(--transition);
+        }
+        .form-select-airline:focus {
+            background-color: white;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+        }
+
+        /* TOGGLES */
+        .mode-selector .btn-check:checked + .btn-outline-primary { 
+            background-color: var(--primary-blue); 
+            color: white; 
+            box-shadow: 0 4px 6px rgba(0, 51, 102, 0.2);
+        }
+        .mode-selector .btn-check:checked + .btn-outline-danger { 
+            background-color: var(--accent-red); 
+            color: white; 
+            box-shadow: 0 4px 6px rgba(210, 20, 28, 0.2);
+        }
+        .mode-selector .btn-outline-primary,
+        .mode-selector .btn-outline-danger {
+            transition: var(--transition);
+            border-width: 2px;
+        }
+        .mode-selector .btn-outline-primary:hover {
+            background-color: rgba(0, 51, 102, 0.1);
+        }
+        .mode-selector .btn-outline-danger:hover {
+            background-color: rgba(210, 20, 28, 0.1);
+        }
+
+        /* BUTTONS */
+        .btn-primary {
+            background-color: var(--primary-blue);
+            border-color: var(--primary-blue);
+            transition: var(--transition);
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover {
+            background-color: #004080;
+            border-color: #004080;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 51, 102, 0.2);
+        }
+        .btn-danger {
+            background-color: var(--accent-red);
+            border-color: var(--accent-red);
+            transition: var(--transition);
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-danger:hover {
+            background-color: #b30e16;
+            border-color: #b30e16;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(210, 20, 28, 0.2);
+        }
+        .btn-success {
+            background-color: var(--sf-green);
+            border-color: var(--sf-green);
+            transition: var(--transition);
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-success:hover {
+            background-color: #00662e;
+            border-color: #00662e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 128, 55, 0.2);
+        }
+        
+        /* EXCEL BUTTON STYLE */
+        .btn-excel {
+            background-color: var(--excel-green);
+            border-color: var(--excel-green);
+            color: white;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        .btn-excel:hover {
+            background-color: #1a5c38;
+            border-color: #1a5c38;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(33, 115, 70, 0.3);
+        }
+
+        /* INPUT EFFECTS */
+        .form-control:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 0.25rem rgba(0, 51, 102, 0.1);
+            transition: var(--transition);
+        }
+        .form-control:hover:not(:focus) {
+            border-color: #cbd5e1;
+        }
+
+        /* CHECKBOXES */
+        .form-check-input:checked {
+            background-color: var(--primary-blue);
+            border-color: var(--primary-blue);
+        }
+        .form-check-input:focus {
+            box-shadow: 0 0 0 0.25rem rgba(0, 51, 102, 0.1);
+        }
+
+        /* TABLE ROW EFFECTS */
+        .table-hover tbody tr:hover {
+            transform: scale(1.01);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* NAVBAR */
+        .navbar {
+            background: linear-gradient(135deg, var(--header-bg) 0%, #334155 100%);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1rem 0;
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .navbar-brand i {
+            font-size: 1.5rem;
+        }
+
+        /* TABS */
+        .nav-pills {
+            background: white;
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+        }
+        .nav-pills .nav-link {
+            color: #64748b;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            margin: 0 0.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        .nav-pills .nav-link:hover {
+            background-color: #f1f5f9;
+            color: #475569;
+        }
+        .nav-pills .nav-link.active {
+            background-color: var(--primary-blue);
+            border-color: var(--primary-blue);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 51, 102, 0.2);
+        }
+
+        /* TABLES */
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .table tbody tr {
+            transition: var(--transition);
+        }
+        .table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+        .table-sm td,
+        .table-sm th {
+            padding: 0.5rem;
+        }
+
+        /* BADGES */
+        .badge {
+            transition: var(--transition);
+            font-weight: 600;
+        }
+        .badge:hover {
+            transform: scale(1.05);
+        }
+
+        /* ANIMATIONS */
+        .flash-fill { animation: flashGreen 0.6s ease-in-out; }
+        @keyframes flashGreen { 
+            0% { background-color: #d1e7dd; } 
+            50% { background-color: #a7f3d0; } 
+            100% { background-color: white; } 
+        }
+        
+        .pax-badge { 
+            font-size: 0.75rem; 
+            padding: 3px 8px; 
+            margin-right: 4px; 
+            display: inline-block; 
+            margin-top: 3px;
+            border-radius: 6px;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .login-card {
+                padding: 2rem 1.5rem;
+                margin: 1rem;
+            }
+            .form-card {
+                padding: 1.5rem;
+            }
+            .nav-pills {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .nav-pills .nav-link {
+                margin: 0.25rem 0;
+            }
+        }
+
+        @media print { 
+            @page {
+                size: A4;
+                margin: 1cm;
+            }
+            .no-print { display: none !important; } 
+
+            body, html {
+                background-color: #fff !important;
+                color: #000 !important;
+            }
+
+            .form-card {
+                box-shadow: none !important;
+                border: 1px solid #dee2e6 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            #appContainer { display: block !important; }
+
+            .tab-content > .tab-pane { display: none !important; }
+            .tab-content > #content-stats {
+                display: block !important;
+                opacity: 1 !important;
+            }
+
+            .table-responsive { overflow: visible !important; }
+
+            .table {
+                width: 100% !important;
+                font-size: 9pt !important;
+            }
+
+            .table th, .table td { padding: 4px !important; }
+
+            .stats-header, .stats-row, .stats-total {
+                background-color: #fff !important;
+                color: #000 !important;
+                font-weight: normal;
+            }
+
+            .stats-header th {
+                font-weight: bold;
+                border-bottom: 2px solid #000 !important;
+            }
+
+            .stats-total td {
+                font-weight: bold !important;
+                color: #000 !important;
+                border-top: 2px solid #000 !important;
+            }
+
+            .text-primary, .text-danger, .text-success { color: #000 !important; }
+            .fw-bold { font-weight: bold !important; }
+        }
+        /* LOADING */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+    <div id="loginOverlay">
+        <div class="login-card">
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center w-16 h-16 bg-primary rounded-full mb-3">
+                    <i class="fas fa-plane-departure fa-2x text-white"></i>
+                </div>
+            </div>
+            <h5 class="text-secondary fw-bold mb-1">ESCALE LOO</h5>
+            <h4 class="mb-3 text-dark fw-bold">ACCÈS SÉCURISÉ</h4>
+            <p class="text-muted mb-4 small">Connectez-vous pour accéder à votre espace de gestion des vols</p>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-light">
+                            <i class="fas fa-envelope text-muted"></i>
+                        </span>
+                        <input type="email" id="loginEmail" class="form-control rounded-end" placeholder="Email" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-light">
+                            <i class="fas fa-lock text-muted"></i>
+                        </span>
+                        <input type="password" id="loginPass" class="form-control rounded-end" placeholder="Mot de passe" required>
+                    </div>
+                </div>
+                <div class="d-grid mb-3">
+                    <button type="submit" class="btn btn-primary fw-bold py-2">
+                        <i class="fas fa-sign-in-alt me-2"></i>SE CONNECTER
+                    </button>
+                </div>
+                <p id="loginError" class="text-danger mt-3 small text-center"></p>
+            </form>
+        </div>
+    </div>
+
+<!-- APP -->
+<div id="appContainer">
+    <nav class="navbar navbar-dark bg-dark mb-4 no-print">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-plane-departure me-2"></i> Flight Ops Manager <span class="badge bg-warning text-dark ms-2">ESCALE LOO</span>
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success">
+                        <i class="fas fa-circle text-white" style="font-size: 0.5rem;"></i> Online
+                    </span>
+                    <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.doLogout()">
+                        <i class="fas fa-sign-out-alt me-1"></i> Déconnexion
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <ul class="nav nav-pills mb-3 justify-content-center no-print" id="mainTab" role="tablist">
+            <li class="nav-item"><button class="nav-link active" id="tab-saisie" data-bs-toggle="pill" data-bs-target="#content-saisie">SAISIE VOLS</button></li>
+            <li class="nav-item"><button class="nav-link" id="tab-db" data-bs-toggle="pill" data-bs-target="#content-db">PLANNING & DB</button></li>
+            <li class="nav-item"><button class="nav-link" id="tab-stats" data-bs-toggle="pill" data-bs-target="#content-stats">STATISTIQUES</button></li>
+        </ul>
+
+        <div class="tab-content">
+            
+            <!-- === TAB 1: SAISIE === -->
+            <div class="tab-pane fade show active" id="content-saisie">
+                <div class="form-card" id="mainCard">
+                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                        <div><h4 class="section-title">SAISIE DES VOLS</h4><span class="text-muted small">Sélectionnez le type de mouvement</span></div>
+                        <div class="btn-group mode-selector" role="group">
+                            <input type="radio" class="btn-check" name="modeFlight" id="modeArr" value="ARRIVEE" checked onchange="toggleMode()">
+                            <label class="btn btn-outline-primary fw-bold px-4" for="modeArr">ARRIVÉE</label>
+                            <input type="radio" class="btn-check" name="modeFlight" id="modeDep" value="DEPARTS" onchange="toggleMode()">
+                            <label class="btn btn-outline-danger fw-bold px-4" for="modeDep">DÉPART</label>
+                        </div>
+                    </div>
+
+                    <form id="flightForm">
+                        <input type="hidden" id="editDocId">
+                        <div id="autoFillBadge" class="alert alert-info py-2 px-3 mb-3 d-none" style="font-size:0.85rem; border-radius: 8px;">
+                            <i class="fas fa-magic me-2"></i> Détails chargés depuis la base de données.
+                        </div>
+
+                        <!-- L1 -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-2">
+                                <label class="form-label">JOUR</label>
+                                <input type="date" class="form-control form-control-sm" id="inpDate" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">N° VOL</label>
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select-airline text-center" id="inpCie" onchange="checkSchedule()">
+                                        <option value="AH" selected>AH</option>
+                                        <option value="SF">SF</option>
+                                    </select>
+                                    <input type="number" class="form-control" id="inpVol" placeholder="0000" required onkeyup="checkSchedule()">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">IMM</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">7T-V</span>
+                                    <input type="text" class="form-control text-uppercase" id="inpImm" maxlength="2" placeholder="XX" required>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">TYPE AVION</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase" id="inpType" placeholder="B738">
+                            </div>
+                            
+                            <!-- UPDATED: DESTINATION (No restriction) -->
+                            <div class="col-md-2">
+                                <label class="form-label text-uppercase text-primary fw-bold">DESTINATION</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase" id="inpRoute" required>
+                            </div>
+                            
+                            <div class="col-md-2 d-none" id="divOffre">
+                                <label class="form-label">OFFRE</label>
+                                <input type="number" class="form-control form-control-sm" id="inpOffre" placeholder="0">
+                            </div>
+                        </div>
+
+                        <!-- L2 -->
+                        <div class="row g-3 mb-4 bg-gradient bg-light p-4 rounded-lg border border-light">
+                            <div class="col-md-3">
+                                <label class="form-label">PRÉVU (STD/STA)</label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold" id="inpTimePre" placeholder="10H00" maxlength="5" oninput="formatTimeInput(this)" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">RÉEL (ATA/ATD)</label>
+                                <input type="text" class="form-control form-control-sm text-center fw-bold" id="inpTimeReel" placeholder="10H00" maxlength="5" oninput="formatTimeInput(this)" onchange="calcDelay()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-danger">RETARD (EDITABLE)</label>
+                                <input type="text" class="form-control form-control-sm fw-bold text-danger" id="inpDelay" placeholder="00H00" maxlength="5" oninput="formatTimeInput(this)">
+                            </div>
+                        </div>
+
+                        <!-- L3 -->
+                        <div class="row g-4">
+                            <div class="col-md-5">
+                                <div class="p-4 border rounded-lg bg-white h-100 shadow-sm">
+                                    <h6 class="text-primary border-bottom pb-2 mb-3 fw-bold d-flex align-items-center">
+                                        <i class="fas fa-users me-2"></i> RÉPARTITION PASSAGERS (PAX)
+                                    </h6>
+                                    <div class="row g-2 mb-3 align-items-center">
+                                        <div class="col-2 fw-bold small">F/C</div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpFcAd" placeholder="AD">
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpFcChd" placeholder="CH">
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpFcInf" placeholder="IN">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-2 fw-bold small">Y/C</div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpYcAd" placeholder="AD">
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpYcChd" placeholder="CH">
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="number" class="form-control form-control-sm" id="inpYcInf" placeholder="IN">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-4 border rounded-lg bg-white h-100 shadow-sm">
+                                    <h6 class="text-secondary border-bottom pb-2 mb-3 fw-bold d-flex align-items-center">
+                                        <i class="fas fa-cubes me-2"></i> LOGISTIQUE & REVENUS
+                                    </h6>
+                                    <div class="row g-3">
+                                        <div class="col-4">
+                                            <label class="col-form-label col-form-label-sm">Bagages</label>
+                                        </div>
+                                        <div class="col-8">
+                                            <input type="number" class="form-control form-control-sm" id="inpBag">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="col-form-label col-form-label-sm">Fret</label>
+                                        </div>
+                                        <div class="col-8">
+                                            <input type="number" class="form-control form-control-sm" id="inpFret">
+                                        </div>
+                                        <div class="col-4">
+                                            <label class="col-form-label col-form-label-sm">Poste</label>
+                                        </div>
+                                        <div class="col-8">
+                                            <input type="number" class="form-control form-control-sm" id="inpMail">
+                                        </div>
+                                        <div class="col-12 mt-2 pt-2 border-top d-none" id="divExcedent">
+                                            <div class="row g-2 align-items-center">
+                                                <div class="col-5">
+                                                    <label class="col-form-label col-form-label-sm fw-bold text-success">EXCÉDENT (DA)</label>
+                                                </div>
+                                                <div class="col-7">
+                                                    <input type="number" class="form-control form-control-sm border-success" id="inpExcedent" placeholder="3000">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="p-4 border rounded-lg bg-white h-100 shadow-sm">
+                                    <h6 class="text-dark border-bottom pb-2 mb-3 fw-bold d-flex align-items-center" id="lblExtra">
+                                        <i class="fas fa-user-tie me-2"></i> COMMANDANT DE BORD
+                                    </h6>
+                                    <textarea class="form-control form-control-sm" id="inpExtra" rows="3" placeholder="Saisir les observations..."></textarea>
+                                    <div class="form-check form-switch mt-3">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="inpCanceled">
+                                        <label class="form-check-label fw-bold text-danger" for="inpCanceled">VOL ANNULÉ</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-5">
+                            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-lg" id="btnAction">
+                                <i class="fas fa-save me-2"></i> ENREGISTRER LE VOL
+                            </button>
+                            <button type="button" class="btn btn-secondary w-100 mt-3 d-none" id="btnCancelEdit" onclick="resetForm()">
+                                <i class="fas fa-times me-2"></i> ANNULER LA MODIFICATION
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SEARCH -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-dark text-white">
+                                <i class="fas fa-search"></i> RECHERCHE DATE
+                            </span>
+                            <input type="date" class="form-control fw-bold" id="searchDate" onchange="filterAndPaginate()">
+                            <button class="btn btn-secondary" onclick="clearSearch()">
+                                <i class="fas fa-sync-alt me-1"></i> TOUT AFFICHER
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SPLIT TABLES WITH PAGINATION -->
+                <div class="row g-4">
+                    <!-- AH Table -->
+                    <div class="col-lg-6">
+                        <div class="form-card p-0 overflow-hidden border-top-0" style="min-height:450px;">
+                            <div class="p-3 text-white" style="background: linear-gradient(135deg, var(--primary-blue) 0%, #004080 100%);">
+                                <h6 class="m-0 text-center fw-bold">
+                                    <i class="fas fa-plane-departure me-2"></i> AIR ALGÉRIE (AH)
+                                </h6>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0 text-center align-middle" style="font-size:0.75rem">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>JOUR</th>
+                                            <th>VOL</th>
+                                            <th>AVION</th>
+                                            <th>ROUTE / PAX</th>
+                                            <th>HORAIRE</th>
+                                            <th>BAG / EXCÉDENT</th>
+                                            <th>ACT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableBodyAH"></tbody>
+                                </table>
+                            </div>
+                            <div class="pagination-container" id="paginationAH"></div>
+                        </div>
+                    </div>
+                    <!-- SF Table -->
+                    <div class="col-lg-6">
+                        <div class="form-card p-0 overflow-hidden border-top-0" style="min-height:450px;">
+                            <div class="p-3 text-white" style="background: linear-gradient(135deg, var(--sf-green) 0%, #00662e 100%);">
+                                <h6 class="m-0 text-center fw-bold">
+                                    <i class="fas fa-plane-arrival me-2"></i> TASSILI (SF)
+                                </h6>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0 text-center align-middle" style="font-size:0.75rem">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>JOUR</th>
+                                            <th>VOL</th>
+                                            <th>AVION</th>
+                                            <th>ROUTE / PAX</th>
+                                            <th>HORAIRE</th>
+                                            <th>BAG / EXCÉDENT</th>
+                                            <th>ACT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tableBodySF"></tbody>
+                                </table>
+                            </div>
+                            <div class="pagination-container" id="paginationSF"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXCEL EXPORT ONLY SECTION -->
+                <div class="form-card mt-4 no-print">
+                    <h5 class="section-title text-success d-flex align-items-center border-bottom pb-2 mb-3">
+                        <i class="fas fa-file-excel me-2"></i> EXPORTATION EXCEL (COMPLÈTE)
+                    </h5>
+                    <div class="row g-3 align-items-end bg-light p-3 border rounded-lg">
+                        <div class="col-md-4">
+                            <label class="form-label">DATE DÉBUT</label>
+                            <input type="date" class="form-control form-control-sm" id="excelStartDate">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">DATE FIN</label>
+                            <input type="date" class="form-control form-control-sm" id="excelEndDate">
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-excel w-100 py-2 fw-bold" onclick="window.exportToExcel()">
+                                <i class="fas fa-download me-2"></i> TÉLÉCHARGER TABLEAU EXCEL
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <!-- === TAB 2: PLANNING === -->
+            <div class="tab-pane fade" id="content-db">
+                <div class="form-card">
+                    <h4 class="section-title text-primary d-flex align-items-center">
+                        <i class="fas fa-database me-2"></i> BASE DE DONNÉES VOLS
+                    </h4>
+                    <div class="row g-3 align-items-end mb-4 border-bottom pb-3">
+                        <input type="hidden" id="editDbId"> 
+                        <div class="col-md-2">
+                            <label class="form-label">CIE & VOL</label>
+                            <div class="input-group input-group-sm">
+                                <select class="form-select form-select-sm" id="dbCie" style="max-width:70px">
+                                    <option>AH</option>
+                                    <option>SF</option>
+                                </select>
+                                <input type="number" class="form-control" id="dbVol" placeholder="6000">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">MOUVEMENT</label>
+                            <select class="form-select form-select-sm" id="dbMouv">
+                                <option value="ARRIVEE">ARRIVÉE</option>
+                                <option value="DEPARTS">DÉPART</option>
+                            </select>
+                        </div>
+                        
+                        <!-- DB DESTINATION (Updated) -->
+                        <div class="col-md-2">
+                            <label class="form-label">DESTINATION</label>
+                            <input type="text" class="form-control form-control-sm text-uppercase" id="dbRoute">
+                        </div>
+                        
+                        <div class="col-md-1">
+                            <label class="form-label">HEURE</label>
+                            <input type="text" class="form-control form-control-sm" id="dbTime" placeholder="10H00" maxlength="5" oninput="formatTimeInput(this)" required>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">TYPE</label>
+                            <input type="text" class="form-control form-control-sm text-uppercase" id="dbType" placeholder="ATR">
+                        </div>
+                        
+                        <!-- Days -->
+                        <div class="col-md-3">
+                            <label class="form-label">FREQUENCE (Jours)</label>
+                            <div class="d-flex justify-content-between">
+                                <input type="checkbox" class="day-check" id="dSun" value="0">
+                                <label for="dSun" class="day-label">D</label>
+                                <input type="checkbox" class="day-check" id="dMon" value="1">
+                                <label for="dMon" class="day-label">L</label>
+                                <input type="checkbox" class="day-check" id="dTue" value="2">
+                                <label for="dTue" class="day-label">M</label>
+                                <input type="checkbox" class="day-check" id="dWed" value="3">
+                                <label for="dWed" class="day-label">M</label>
+                                <input type="checkbox" class="day-check" id="dThu" value="4">
+                                <label for="dThu" class="day-label">J</label>
+                                <input type="checkbox" class="day-check" id="dFri" value="5">
+                                <label for="dFri" class="day-label">V</label>
+                                <input type="checkbox" class="day-check" id="dSat" value="6">
+                                <label for="dSat" class="day-label">S</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-1 d-flex">
+                            <button class="btn btn-success btn-sm w-100 fw-bold" id="btnDbAdd" onclick="saveSchedule()">
+                                <i class="fas fa-plus me-1"></i>
+                            </button>
+                            <button class="btn btn-secondary btn-sm ms-1 d-none" id="btnDbCancel" onclick="resetDbForm()">
+                                <i class="fas fa-times me-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive mb-5" style="max-height: 300px; overflow-y:auto;">
+                        <table class="table table-bordered table-striped text-center table-sm">
+                            <thead class="table-dark" style="position: sticky; top: 0;">
+                                <tr>
+                                    <th>VOL</th>
+                                    <th>MOUV</th>
+                                    <th>DESTINATION</th>
+                                    <th>HEURE</th>
+                                    <th>TYPE</th>
+                                    <th>JOURS</th>
+                                    <th>ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dbTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Generator -->
+                    <h4 class="section-title text-danger border-top pt-3 d-flex align-items-center">
+                        <i class="fas fa-calendar-alt me-2"></i> GÉNÉRATEUR DE PLANNING MENSUEL
+                    </h4>
+                    <div class="row g-3 align-items-end bg-gradient bg-light p-4 border rounded-lg">
+                        <div class="col-md-3">
+                            <label class="form-label">DATE DÉBUT</label>
+                            <input type="date" class="form-control form-control-sm" id="genStart">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">DATE FIN</label>
+                            <input type="date" class="form-control form-control-sm" id="genEnd">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">DESTINATION</label>
+                            <select id="genDestination" class="form-select form-select-sm">
+                                <option value="ALL" selected>Toutes les destinations</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-danger w-100 py-2 fw-bold" onclick="generateScheduleFromDB()">
+                                <i class="fas fa-magic me-2"></i> GÉNÉRER LES VOLS
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <!-- === TAB 3: STATS === -->
+            <div class="tab-pane fade" id="content-stats">
+                <div class="form-card">
+                    <div class="d-flex justify-content-between mb-4 align-items-center">
+                        <h4 class="section-title d-flex align-items-center">
+                            <i class="fas fa-chart-line me-2"></i> STATISTIQUES
+                        </h4>
+                        <button class="btn btn-outline-dark btn-sm no-print" onclick="window.print()">
+                            <i class="fas fa-print me-2"></i> IMPRIMER
+                        </button>
+                    </div>
+                    <div class="row g-3 mb-5 bg-gradient bg-light p-4 border rounded-lg no-print">
+                        <div class="col-md-2">
+                            <label class="form-label">TYPE</label>
+                            <select class="form-select form-select-sm" id="statFilterType">
+                                <option value="DEPARTS">DÉPARTS</option>
+                                <option value="ARRIVEE">ARRIVÉES</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">CIE</label>
+                            <select class="form-select form-select-sm" id="statFilterCie">
+                                <option value="ALL">TOUTES</option>
+                                <option value="AH">AH</option>
+                                <option value="SF">SF</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">DU</label>
+                            <input type="date" id="filterFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">AU</label>
+                            <input type="date" id="filterTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-dark w-100 py-2" onclick="generateReport()">
+                                <i class="fas fa-chart-bar me-2"></i> ANALYSER
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row mb-4 text-center no-print">
+                        <div class="col-md-4 offset-md-4">
+                            <div class="border rounded-lg p-3 bg-white shadow-sm">
+                                <div class="small text-muted mb-1">VOLS ANNULÉS (PÉRIODE SÉLECTIONNÉE)</div>
+                                <h3 id="statsCanceledCount" class="text-danger fw-bold">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered text-center table-sm shadow-sm">
+                            <thead class="stats-header">
+                                <tr>
+                                    <th>OFFRE</th>
+                                    <th>DEST</th>
+                                    <th>N° VOLS</th>
+                                    <th>PAX F (Sièges)</th>
+                                    <th>PAX Y (Sièges)</th>
+                                    <th>B (BAG)</th>
+                                    <th>C (FRET)</th>
+                                    <th>M (POSTE)</th>
+                                    <th>EXCÉDENT (DA)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statsBody"></tbody>
+                            <tfoot id="statsFooter"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center p-4 mt-auto text-muted no-print" style="background: #e2e8f0; font-size: 0.85rem; border-top: 1px solid #cbd5e1;">
+        <div class="container">
+            <p class="mb-1">
+                <strong>Flight Ops Manager</strong> © 2026 - Développé par <strong>Demana Abdelmadjid</strong>
+            </p>
+            <p class="mb-0 small text-muted">
+                Application de gestion des opérations aériennes | Version 5.0
+            </p>
+        </div>
+    </footer>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, updateDoc, doc, query, orderBy, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+    // >>>>> CONFIGURATION DU PROJET FIREBASE <<<<<
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUY6pCURvolhEXVSAEKxXgkAVxit273rU",
+      authDomain: "flight-ops-manager---final-gha.firebaseapp.com",
+      projectId: "flight-ops-manager---final-gha",
+      storageBucket: "flight-ops-manager---final-gha.firebasestorage.app",
+      messagingSenderId: "613871892928",
+      appId: "1:613871892928:web:5c36f8e8f69dfb4bf23025",
+      measurementId: "G-5G3VVM0RCF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const flightCol = collection(db, "flights");
+    const scheduleCol = collection(db, "schedules");
+
+    let allFlights = [];
+    let allSchedules = [];
+    
+    // Pagination State
+    let currentPageAH = 1;
+    let currentPageSF = 1;
+    const rowsPerPage = 10;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) { document.getElementById('loginOverlay').style.display = 'none'; document.getElementById('appContainer').style.display = 'flex'; document.getElementById('appContainer').style.flexDirection = 'column'; document.getElementById('appContainer').style.minHeight = '100vh'; initApp(); }
+        else { document.getElementById('loginOverlay').style.display = 'flex'; document.getElementById('appContainer').style.display = 'none'; }
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const loginButton = e.target.querySelector('button[type="submit"]');
+        const originalButtonHTML = loginButton.innerHTML;
+        loginButton.disabled = true;
+        loginButton.innerHTML = `<span class="loading-spinner me-2"></span> Connexion en cours...`;
+        const errorElement = document.getElementById('loginError');
+        errorElement.innerText = "";
+
+        signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPass').value)
+        .catch((error) => {
+            let errorMessage = "Une erreur est survenue. Veuillez réessayer.";
+            switch (error.code) {
+                case 'auth/invalid-email': errorMessage = "L'adresse email fournie n'est pas valide."; break;
+                case 'auth/user-disabled': errorMessage = "Ce compte utilisateur a été désactivé."; break;
+                case 'auth/invalid-credential': errorMessage = "Email ou mot de passe incorrect."; break;
+                case 'auth/too-many-requests': errorMessage = "Accès temporairement bloqué. Veuillez réessayer plus tard."; break;
+            }
+            errorElement.innerText = errorMessage;
+        })
+        .finally(() => {
+            loginButton.disabled = false;
+            loginButton.innerHTML = originalButtonHTML;
+        });
+    });
+
+    window.doLogout = () => signOut(auth).then(() => location.reload());
+
+    function initApp() {
+        document.getElementById('inpDate').valueAsDate = new Date();
+        document.getElementById('genStart').valueAsDate = new Date();
+        const nextMonth = new Date(); nextMonth.setMonth(nextMonth.getMonth() + 1);
+        document.getElementById('genEnd').valueAsDate = nextMonth;
+        
+        document.getElementById('filterFrom').valueAsDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        document.getElementById('filterTo').valueAsDate = new Date();
+
+        document.getElementById('excelStartDate').valueAsDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        document.getElementById('excelEndDate').valueAsDate = new Date();
+        toggleMode();
+
+        const q = query(flightCol, orderBy("date", "desc"));
+        onSnapshot(q, (snapshot) => {
+            allFlights = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                allFlights.push(data);
+            });
+            filterAndPaginate();
+        });
+
+        const qSched = query(scheduleCol, orderBy("vol", "asc"));
+        onSnapshot(qSched, (snapshot) => {
+            allSchedules = [];
+            document.getElementById("dbTableBody").innerHTML = "";
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                allSchedules.push(data);
+                const daysMap = {0:'Dim',1:'Lun',2:'Mar',3:'Mer',4:'Jeu',5:'Ven',6:'Sam'};
+                let daysStr = "";
+                if(data.days && data.days.length > 0) {
+                    daysStr = data.days.map(d => `<span class="badge bg-secondary" style="font-size:0.6rem; margin-right:1px">${daysMap[d]}</span>`).join('');
+                }
+                document.getElementById("dbTableBody").innerHTML += `<tr><td class="fw-bold">${data.cie} ${data.vol}</td><td>${data.mouv}</td><td>${data.route}</td><td>${data.time}</td><td>${data.typeAc}</td><td>${daysStr}</td><td><button class="btn btn-sm btn-outline-warning me-1" onclick="editSchedule('${data.id}')"><i class="fas fa-pen"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteSchedule('${data.id}')"><i class="fas fa-trash"></i></button></td></tr>`;
+            });
+
+            // Populate generator dropdown
+            const destinations = [...new Set(allSchedules.map(s => s.route).filter(Boolean))].sort();
+            const genSelect = document.getElementById('genDestination');
+            genSelect.innerHTML = '<option value="ALL" selected>Toutes les destinations</option>';
+            destinations.forEach(dest => {
+                genSelect.innerHTML += `<option value="${dest}">${dest}</option>`;
+            });
+        });
+    }
+
+    // --- PAGINATION & FILTER LOGIC ---
+    window.filterAndPaginate = () => {
+        const searchDate = document.getElementById("searchDate").value;
+        const filtered = searchDate ? allFlights.filter(f => f.date === searchDate) : allFlights;
+
+        const flightsAH = filtered.filter(f => f.cie === 'AH' || !f.cie);
+        const flightsSF = filtered.filter(f => f.cie === 'SF');
+
+        renderTablePage(flightsAH, 'AH', currentPageAH);
+        renderTablePage(flightsSF, 'SF', currentPageSF);
+    };
+
+    function renderTablePage(dataArray, type, page) {
+        const tbody = document.getElementById(type === 'AH' ? 'tableBodyAH' : 'tableBodySF');
+        const pagContainer = document.getElementById(type === 'AH' ? 'paginationAH' : 'paginationSF');
+        tbody.innerHTML = "";
+        pagContainer.innerHTML = "";
+
+        const totalRows = dataArray.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+        
+        if (page > totalPages) page = totalPages || 1;
+        if (page < 1) page = 1;
+        
+        if (type === 'AH') currentPageAH = page; else currentPageSF = page;
+
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        const paginatedData = dataArray.slice(start, end);
+
+        paginatedData.forEach(f => renderRow(f, tbody));
+
+        if (totalPages > 1) {
+            if (page > 1) pagContainer.innerHTML += `<button class="page-btn" onclick="changePage('${type}', ${page - 1})">&laquo;</button>`;
+            
+            for (let i = 1; i <= totalPages; i++) {
+                const activeClass = (i === page) ? (type === 'AH' ? 'active' : 'active-sf') : '';
+                pagContainer.innerHTML += `<button class="page-btn ${activeClass}" onclick="changePage('${type}', ${i})">${i}</button>`;
+            }
+            
+            if (page < totalPages) pagContainer.innerHTML += `<button class="page-btn" onclick="changePage('${type}', ${page + 1})">&raquo;</button>`;
+        }
+    }
+
+    window.changePage = (type, newPage) => {
+        if (type === 'AH') currentPageAH = newPage;
+        else currentPageSF = newPage;
+        filterAndPaginate();
+    };
+
+    window.clearSearch = () => {
+        document.getElementById("searchDate").value = "";
+        filterAndPaginate();
+    };
+
+    // --- RENDER ROW ---
+    function renderRow(f, targetBody) {
+        const fmtDate = formatDateDisplay(f.date);
+        const tr = document.createElement("tr");
+        if (f.isCanceled) {
+            tr.classList.add('table-danger');
+            const typeLabel = f.type === 'ARRIVEE' ? 'ARR' : 'DÉP';
+            tr.innerHTML = `<td>${fmtDate}</td><td><span class="badge bg-dark" style="font-size:0.6rem">${typeLabel}</span> <b>${f.vol}</b></td><td>7T-V${f.imm} <div class="text-muted small">(${f.typeAc || '?'})</div></td><td class="text-start ps-4"><strong>${f.route}</strong></td><td colspan="2" class="text-center fw-bold">--- VOL ANNULÉ ---</td><td><button class="btn btn-sm btn-link text-secondary p-0 me-2" onclick="window.editFlight('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="window.deleteFlight('${f.id}')"><i class="fas fa-trash"></i></button></td>`;
+        } else {
+            const badgeClass = f.type === 'ARRIVEE' ? 'bg-primary' : 'bg-danger';
+            const typeLabel = f.type === 'ARRIVEE' ? 'ARR' : 'DÉP';
+            const fmtTime = f.timeReel ? f.timeReel.replace(':', 'H') : '';
+            const seatsF = (parseInt(f.paxFcAd)||0) + (parseInt(f.paxFcChd)||0);
+            const seatsY = (parseInt(f.paxYcAd)||0) + (parseInt(f.paxYcChd)||0);
+            const inF = parseInt(f.paxFcInf)||0; const inY = parseInt(f.paxYcInf)||0;
+            const textF = inF > 0 ? `F: <b>${seatsF}</b>+${inF}INF` : `F: <b>${seatsF}</b>`;
+            const textY = inY > 0 ? `Y: <b>${seatsY}</b>+${inY}INF` : `Y: <b>${seatsY}</b>`;
+            let timeDisplay = fmtTime; if(f.delayStr) timeDisplay += `<br><span class="badge bg-danger" style="font-size:0.6rem">DL: ${f.delayStr}</span>`;
+            let logDisplay = `${f.bag || 0} Kg`; if(f.excedent > 0) logDisplay += `<br><span class="text-success fw-bold small">${f.excedent} DA</span>`;
+            tr.innerHTML = `<td>${fmtDate}</td><td><span class="badge ${badgeClass}" style="font-size:0.6rem">${typeLabel}</span> <b>${f.vol}</b></td><td>7T-V${f.imm} <div class="text-muted small">(${f.typeAc || '?'})</div></td><td class="text-start ps-4"><strong>${f.route}</strong><br><span class="pax-badge bg-primary text-white">${textF}</span><span class="pax-badge bg-secondary text-white">${textY}</span></td><td class="fw-bold">${timeDisplay}</td><td>${logDisplay}</td><td><button class="btn btn-sm btn-link text-secondary p-0 me-2" onclick="window.editFlight('${f.id}')"><i class="fas fa-pen"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="window.deleteFlight('${f.id}')"><i class="fas fa-trash"></i></button></td>`;
+        }
+        targetBody.appendChild(tr);
+    }
+
+    // --- FLIGHT LOGIC ---
+    window.toggleMode = () => {
+        const mode = document.querySelector('input[name="modeFlight"]:checked').value;
+        const card = document.getElementById('mainCard');
+        const divOffre = document.getElementById('divOffre'); const lblExtra = document.getElementById('lblExtra');
+        const btnAction = document.getElementById('btnAction'); const divExcedent = document.getElementById('divExcedent');
+        if (mode === 'ARRIVEE') {
+            card.style.borderTopColor = "#002b5c"; 
+            divOffre.classList.add('d-none'); lblExtra.innerText = "COMMANDANT DE BORD (CDB)"; divExcedent.classList.add('d-none');
+            if(!document.getElementById("editDocId").value) { btnAction.className = "btn btn-primary w-100 py-3 fw-bold shadow-lg"; btnAction.innerHTML = "<i class='fas fa-save me-2'></i> ENREGISTRER L'ARRIVÉE"; }
+        } else { // DEPARTS
+            card.style.borderTopColor = "#D2141C"; 
+            divOffre.classList.remove('d-none'); lblExtra.innerText = "OBSERVATIONS (DL)"; divExcedent.classList.remove('d-none');
+            if(!document.getElementById("editDocId").value) { btnAction.className = "btn btn-danger w-100 py-3 fw-bold shadow-lg"; btnAction.innerHTML = "<i class='fas fa-save me-2'></i> ENREGISTRER LE DÉPART"; }
+        }
+    };
+
+    document.getElementById("flightForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const mode = document.querySelector('input[name="modeFlight"]:checked').value;
+        const prev = document.getElementById("inpTimePre").value; const reel = document.getElementById("inpTimeReel").value;
+        let delayStr = document.getElementById("inpDelay").value;
+        const data = {
+            type: mode, date: document.getElementById("inpDate").value, imm: document.getElementById("inpImm").value.toUpperCase(),
+            typeAc: document.getElementById("inpType").value.toUpperCase(), cie: document.getElementById("inpCie").value,
+            vol: document.getElementById("inpVol").value, route: document.getElementById("inpRoute").value.toUpperCase(),
+            offre: parseInt(document.getElementById("inpOffre").value) || 0, timePre: prev, timeReel: reel, delayStr: delayStr,
+            paxFcAd: parseInt(document.getElementById("inpFcAd").value)||0, paxFcChd: parseInt(document.getElementById("inpFcChd").value)||0, paxFcInf: parseInt(document.getElementById("inpFcInf").value)||0,
+            paxYcAd: parseInt(document.getElementById("inpYcAd").value)||0, paxYcChd: parseInt(document.getElementById("inpYcChd").value)||0, paxYcInf: parseInt(document.getElementById("inpYcInf").value)||0,
+            bag: parseInt(document.getElementById("inpBag").value)||0, fret: parseInt(document.getElementById("inpFret").value)||0, mail: parseInt(document.getElementById("inpMail").value)||0, 
+            excedent: parseInt(document.getElementById("inpExcedent").value)||0, extra: document.getElementById("inpExtra").value, createdAt: Timestamp.now(),
+            isCanceled: document.getElementById("inpCanceled").checked
+        };
+        const editId = document.getElementById("editDocId").value;
+        if(editId) { await updateDoc(doc(db, "flights", editId), data); } else { await addDoc(flightCol, data); }
+        resetForm();
+    });
+
+    window.deleteFlight = async (id) => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, "flights", id)); };
+    window.editFlight = (id) => {
+        const f = allFlights.find(x => x.id === id); if(!f) return;
+        if(f.type === 'ARRIVEE') document.getElementById('modeArr').checked = true; else document.getElementById('modeDep').checked = true;
+        
+        document.getElementById("editDocId").value = id; document.getElementById("inpDate").value = f.date; document.getElementById("inpImm").value = f.imm; 
+        document.getElementById("inpType").value = f.typeAc; document.getElementById("inpCie").value = f.cie || 'AH'; document.getElementById("inpVol").value = f.vol;
+        document.getElementById("inpRoute").value = f.route; document.getElementById("inpOffre").value = f.offre; document.getElementById("inpTimePre").value = f.timePre; 
+        document.getElementById("inpTimeReel").value = f.timeReel; document.getElementById("inpFcAd").value = f.paxFcAd; document.getElementById("inpFcChd").value = f.paxFcChd;
+        document.getElementById("inpFcInf").value = f.paxFcInf; document.getElementById("inpYcAd").value = f.paxYcAd; document.getElementById("inpYcChd").value = f.paxYcChd;
+        document.getElementById("inpYcInf").value = f.paxYcInf; document.getElementById("inpBag").value = f.bag; document.getElementById("inpFret").value = f.fret; 
+        document.getElementById("inpMail").value = f.mail; document.getElementById("inpExcedent").value = f.excedent || ""; document.getElementById("inpExtra").value = f.extra;
+        document.getElementById("inpCanceled").checked = f.isCanceled || false;
+        document.getElementById("inpDelay").value = f.delayStr || "";
+        const btn = document.getElementById("btnAction"); btn.innerHTML = '<i class="fas fa-sync"></i> METTRE À JOUR';
+        btn.className = "btn btn-warning w-100 py-3 fw-bold shadow-sm"; document.getElementById("btnCancelEdit").classList.remove("d-none");
+        toggleMode();
+        window.scrollTo(0,0);
+    };
+    window.resetForm = () => {
+        document.getElementById("flightForm").reset(); document.getElementById('inpDate').valueAsDate = new Date(); document.getElementById("editDocId").value = ""; 
+        document.getElementById("btnCancelEdit").classList.add("d-none"); document.getElementById("autoFillBadge").classList.add("d-none"); 
+        toggleMode();
+    };
+    window.calcDelay = () => {
+        const prev = document.getElementById("inpTimePre").value; const reel = document.getElementById("inpTimeReel").value;
+        if(prev && reel) {
+            const p = prev.replace('H', ':'); const r = reel.replace('H', ':');
+            const d1 = new Date(`2000-01-01T${p}`); const d2 = new Date(`2000-01-01T${r}`);
+            if(!isNaN(d1) && !isNaN(d2)) {
+                const diff = (d2 - d1) / 60000;
+                if(diff > 0) { const h = Math.floor(diff/60); const m = diff % 60; document.getElementById("inpDelay").value = `${h < 10 ? '0'+h : h}H${m < 10 ? '0'+m : m}`; } 
+                else document.getElementById("inpDelay").value = "";
+            }
+        }
+    };
+    window.checkSchedule = () => {
+        const vol = document.getElementById("inpVol").value; const cie = document.getElementById("inpCie").value;
+        if(vol.length >= 3) {
+            const found = allSchedules.find(s => s.vol == vol && s.cie == cie);
+            if(found) {
+                const b = document.getElementById("autoFillBadge"); b.classList.remove("d-none"); b.classList.add("flash-fill"); setTimeout(() => b.classList.remove("flash-fill"), 1000);
+                document.getElementById("inpRoute").value = found.route; document.getElementById("inpTimePre").value = found.time; document.getElementById("inpType").value = found.typeAc;
+                if(found.mouv === 'ARRIVEE') document.getElementById('modeArr').checked = true; else document.getElementById('modeDep').checked = true;
+                toggleMode();
+            } else document.getElementById("autoFillBadge").classList.add("d-none");
+        }
+    };
+
+    // --- GENERATOR LOGIC ---
+    window.generateScheduleFromDB = async () => {
+        const destinationFilter = document.getElementById("genDestination").value;
+
+        const start = new Date(document.getElementById("genStart").value); const end = new Date(document.getElementById("genEnd").value);
+        if(start > end) return alert("Date invalide");
+
+        const confirmMessage = (destinationFilter === 'ALL') ?
+            "Générer le planning pour toutes les destinations programmées ?" :
+            `Générer le planning uniquement pour la destination ${destinationFilter} ?`;
+        if (!confirm(confirmMessage)) return;
+
+        const batch = writeBatch(db);
+        let count = 0;
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay().toString(); const dateStr = d.toISOString().split('T')[0];
+
+            const schedulesToConsider = (destinationFilter === 'ALL') ?
+                allSchedules :
+                allSchedules.filter(s => s.route === destinationFilter);
+
+            const matching = schedulesToConsider.filter(s => s.days && s.days.includes(dayOfWeek));
+            matching.forEach(s => {
+                const newDocRef = doc(flightCol);
+                batch.set(newDocRef, {
+                    date: dateStr, cie: s.cie, vol: s.vol, mouv: s.mouv, route: s.route, type: s.mouv, typeAc: s.typeAc,
+                    timePre: s.time, timeReel: "", imm: "XX", createdAt: Timestamp.now(),
+                    paxFcAd: 0, paxFcChd: 0, paxFcInf: 0, paxYcAd: 0, paxYcChd: 0, paxYcInf: 0, bag: 0, fret: 0, mail: 0, excedent: 0, offre: 0, delayStr: ""
+                });
+                count++;
+            });
+        }
+        if (count > 0) {
+            await batch.commit();
+            alert(`${count} vols générés !`);
+            filterAndPaginate();
+        } else {
+            alert("Aucun vol programmé pour la destination et les jours choisis.");
+        }
+    };
+
+    // --- EXCEL EXPORT (UPDATED) ---
+    window.exportToExcel = () => {
+        try {
+            if (typeof XLSX === 'undefined') return alert("ERREUR: La librairie Excel (SheetJS) n'est pas chargée. Vérifiez votre connexion.");
+
+            const startDateStr = document.getElementById("excelStartDate").value;
+            const endDateStr = document.getElementById("excelEndDate").value;
+            if (!startDateStr || !endDateStr) return alert("Veuillez sélectionner une date de début et de fin.");
+            if (startDateStr > endDateStr) return alert("Date de début invalide.");
+
+            const flightsToExport = allFlights.filter(f => f.date && f.date >= startDateStr && f.date <= endDateStr)
+                .sort((a, b) => a.date.localeCompare(b.date) || (a.timePre || "").localeCompare(b.timePre || ""));
+
+            if (flightsToExport.length === 0) return alert("Aucun vol trouvé pour cette période.");
+
+            // Prepare Data for Excel
+            const excelData = flightsToExport.map(f => {
+                const totalF = (parseInt(f.paxFcAd)||0) + (parseInt(f.paxFcChd)||0);
+                const totalY = (parseInt(f.paxYcAd)||0) + (parseInt(f.paxYcChd)||0);
+                const grandTotal = totalF + totalY;
+                
+                return {
+                    "Date": formatDateDisplay(f.date),
+                    "Compagnie": f.cie || "AH",
+                    "Num Vol": f.vol,
+                    "Imm": `7T-V${f.imm}`,
+                    "Type Avion": f.typeAc || "",
+                    "Mouvement": f.type === 'ARRIVEE' ? 'ARRIVEE' : 'DEPART',
+                    "Destination/Prov": f.route,
+                    "Heure Prevu": f.timePre || "",
+                    "Heure Reel": f.timeReel || "",
+                    "Retard": f.delayStr || "",
+                    "Offre": f.offre || 0,
+                    "F/C AD": f.paxFcAd || 0,
+                    "F/C CH": f.paxFcChd || 0,
+                    "F/C IN": f.paxFcInf || 0,
+                    "Y/C AD": f.paxYcAd || 0,
+                    "Y/C CH": f.paxYcChd || 0,
+                    "Y/C IN": f.paxYcInf || 0,
+                    "Total Pax (Siege)": grandTotal,
+                    "Bagages (Kg)": f.bag || 0,
+                    "Fret (Kg)": f.fret || 0,
+                    "Poste (Kg)": f.mail || 0,
+                    "Excedent (DA)": f.excedent || 0,
+                    "Statut": f.isCanceled ? "ANNULE" : "OK",
+                    "Observations": f.extra || ""
+                };
+            });
+
+            // Create Worksheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            
+            // Adjust column widths (Optional but good for UX)
+            const wscols = [
+                {wch:12}, {wch:8}, {wch:8}, {wch:10}, {wch:10}, {wch:12}, {wch:15}, 
+                {wch:10}, {wch:10}, {wch:10}, {wch:8}, {wch:8}, {wch:8}, {wch:8}, 
+                {wch:8}, {wch:8}, {wch:8}, {wch:12}, {wch:10}, {wch:10}, {wch:10}, {wch:12}, {wch:10}, {wch:30}
+            ];
+            worksheet['!cols'] = wscols;
+
+            // Create Workbook
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Rapport_Vols");
+
+            // Save File
+            XLSX.writeFile(workbook, `Rapport_Vols_${startDateStr}_au_${endDateStr}.xlsx`);
+
+        } catch (error) {
+            console.error(error);
+            alert("Erreur Excel: " + error.message);
+        }
+    };
+
+    // Stats logic
+    window.generateReport = () => {
+        const fromDateStr = document.getElementById("filterFrom").value;
+        const toDateStr = document.getElementById("filterTo").value;
+        const fromDate = new Date(fromDateStr); 
+        const toDate = new Date(toDateStr);
+        toDate.setHours(23, 59, 59, 999);
+
+        const typeFilter = document.getElementById("statFilterType").value; const cieFilter = document.getElementById("statFilterCie").value;
+        const flightsInPeriod = allFlights.filter(f => { const d = new Date(f.date); return d >= fromDate && d <= toDate; }); 
+        const canceledCount = flightsInPeriod.filter(f => { const fltCie = f.cie || 'AH'; return f.isCanceled && f.type === typeFilter && ((cieFilter === "ALL") || (fltCie === cieFilter)); }).length;
+        document.getElementById("statsCanceledCount").innerText = canceledCount;
+        const filtered = flightsInPeriod.filter(f => { const fltCie = f.cie || 'AH'; return !f.isCanceled && f.timeReel && f.type === typeFilter && ((cieFilter === "ALL") || (fltCie === cieFilter)); });
+        const groups = {}; let gPax=0, gOffre=0;
+        filtered.forEach(f => {
+            const dest = f.route; if(!groups[dest]) groups[dest] = { offre:0, paxF:0, paxY:0, bag:0, fret:0, mail:0, exc:0, count:0 };
+            const seatsF = (parseInt(f.paxFcAd)||0) + (parseInt(f.paxFcChd)||0); const seatsY = (parseInt(f.paxYcAd)||0) + (parseInt(f.paxYcChd)||0);
+            groups[dest].offre += (parseInt(f.offre)||0); groups[dest].paxF += seatsF; groups[dest].paxY += seatsY;
+            groups[dest].bag += (parseInt(f.bag)||0); groups[dest].fret += (parseInt(f.fret)||0); groups[dest].mail += (parseInt(f.mail)||0); 
+            groups[dest].exc += (parseInt(f.excedent)||0); groups[dest].count += 1;
+            gPax += (seatsF + seatsY); gOffre += (parseInt(f.offre)||0);
+        });
+        document.getElementById("statsBody").innerHTML = "";
+        let tOffre=0, tF=0, tY=0, tB=0, tC=0, tM=0, tExc=0, tCount=0;
+        for (const [dest, d] of Object.entries(groups)) {
+            tOffre += d.offre; tF += d.paxF; tY += d.paxY; tB += d.bag; tC += d.fret; tM += d.mail; tExc += d.exc; tCount += d.count;
+            document.getElementById("statsBody").innerHTML += `<tr class="stats-row"><td>${d.offre}</td><td>${dest}</td><td class="text-primary fw-bold">${d.count}</td><td class="text-danger fw-bold">${d.paxF}</td><td class="text-danger fw-bold">${d.paxY}</td><td>${d.bag}</td><td>${d.fret}</td><td>${d.mail}</td><td class="fw-bold text-success">${d.exc} DA</td></tr>`;
+        }
+        document.getElementById("statsFooter").innerHTML = `<tr class="stats-total"><td>${tOffre}</td><td>TOTAL</td><td class="text-primary fw-bold">${tCount}</td><td class="text-danger fw-bold">${tF}</td><td class="text-danger fw-bold">${tY}</td><td>${tB}</td><td>${tC}</td><td>${tM}</td><td class="fw-bold text-success">${tExc} DA</td></tr>`;
+    };
+
+    // --- DB ACTIONS ---
+    window.saveSchedule = async () => {
+        const id = document.getElementById("editDbId").value; const checkedDays = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => cb.value);
+        const data = {
+            cie: document.getElementById("dbCie").value,
+            vol: document.getElementById("dbVol").value,
+            mouv: document.getElementById("dbMouv").value,
+            route: document.getElementById("dbRoute").value.toUpperCase(),
+            time: document.getElementById("dbTime").value,
+            typeAc: document.getElementById("dbType").value.toUpperCase(),
+            days: checkedDays
+        };
+        if (!data.vol) return alert("Le numéro de vol est requis.");
+        if (!data.time) return alert("L'heure de vol est requise.");
+        if (id) {
+            await updateDoc(doc(db, "schedules", id), data);
+            alert("Modifié !");
+        } else {
+            await addDoc(scheduleCol, data);
+            alert("Ajouté !");
+        }
+        resetDbForm();
+    };
+    window.editSchedule = (id) => {
+        const s = allSchedules.find(x => x.id === id); if(!s) return;
+        document.getElementById("editDbId").value = id; document.getElementById("dbCie").value = s.cie; document.getElementById("dbVol").value = s.vol;
+        document.getElementById("dbMouv").value = s.mouv; document.getElementById("dbRoute").value = s.route;
+        document.getElementById("dbTime").value = s.time; document.getElementById("dbType").value = s.typeAc;
+        document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
+        if(s.days) s.days.forEach(d => { const cb = document.querySelector(`.day-check[value="${d}"]`); if(cb) cb.checked = true; });
+        const btn = document.getElementById("btnDbAdd"); btn.innerHTML = '<i class="fas fa-save me-1"></i>'; btn.className = "btn btn-warning btn-sm w-100 fw-bold";
+        document.getElementById("btnDbCancel").classList.remove("d-none");
+    };
+    window.resetDbForm = () => {
+        document.getElementById("editDbId").value = "";
+        document.getElementById("dbVol").value = "";
+        document.getElementById("dbRoute").value = ""; document.getElementById("dbTime").value = ""; document.getElementById("dbType").value = "";
+        document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
+        const btn = document.getElementById("btnDbAdd"); btn.innerHTML = '<i class="fas fa-plus me-1"></i>'; btn.className = "btn btn-success btn-sm w-100 fw-bold";
+        document.getElementById("btnDbCancel").classList.add("d-none");
+    };
+    window.deleteSchedule = async (id) => { if(confirm("Supprimer ?")) await deleteDoc(doc(db, "schedules", id)); };
+
+    window.formatTimeInput = (input) => { let val = input.value.replace(/[^0-9]/g, ''); if(val.length > 2) val = val.substring(0, 2) + 'H' + val.substring(2, 4); input.value = val; };
+    window.formatDateDisplay = (dateStr) => { if(!dateStr) return ""; const [y, m, d] = dateStr.split('-'); return `${d}/${m}/${y}`; };
+
+    // Assign to window
+    window.toggleMode = toggleMode;
+    window.resetForm = resetForm;
+    window.calcDelay = calcDelay;
+    window.generateReport = generateReport;
+    window.checkSchedule = checkSchedule;
+    window.deleteFlight = deleteFlight;
+    window.editFlight = editFlight;
+    window.changePage = changePage;
+    window.clearSearch = clearSearch;
+    window.exportToExcel = exportToExcel;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
